@@ -127,6 +127,7 @@ const maxEvents = 200
 type Governor struct {
 	engine  Engine
 	sampler Sampler
+	store   Store
 	log     *slog.Logger
 	now     func() time.Time
 
@@ -164,6 +165,42 @@ func New(engine Engine, sampler Sampler, cfg Config, log *slog.Logger) *Governor
 	}
 }
 
+// Restore loads saved settings and paused containers from store and saves
+// every later change to it.
+func (g *Governor) Restore(store Store) error {
+	g.tickMu.Lock()
+	defer g.tickMu.Unlock()
+	g.store = store
+	state, found, err := store.Load()
+	if err != nil || !found {
+		return err
+	}
+	if err := state.Config.Validate(); err == nil {
+		g.mu.Lock()
+		g.cfg = state.Config
+		g.mu.Unlock()
+	} else {
+		g.event("warn", "ignoring saved settings: "+err.Error())
+	}
+	for _, p := range state.Paused {
+		g.paused[p.ID] = p
+	}
+	if len(state.Paused) > 0 {
+		g.event("info", fmt.Sprintf("restored %d paused container(s) from the last run", len(state.Paused)))
+	}
+	return nil
+}
+
+// save writes the current state. Callers hold tickMu.
+func (g *Governor) save() {
+	if g.store == nil {
+		return
+	}
+	if err := g.store.Save(State{Config: g.Config(), Paused: g.pausedList()}); err != nil {
+		g.event("error", "could not save state: "+err.Error())
+	}
+}
+
 // Config returns the current configuration.
 func (g *Governor) Config() Config {
 	g.mu.Lock()
@@ -176,10 +213,13 @@ func (g *Governor) SetConfig(cfg Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
+	g.tickMu.Lock()
+	defer g.tickMu.Unlock()
 	g.mu.Lock()
 	g.cfg = cfg
 	g.mu.Unlock()
 	g.event("info", "settings updated")
+	g.save()
 	return nil
 }
 
@@ -228,7 +268,7 @@ func (g *Governor) Tick(ctx context.Context) {
 	for _, c := range containers {
 		byID[c.ID] = c
 	}
-	g.forgetGone(byID)
+	dirty := g.forgetGone(byID)
 	if !hot {
 		clear(g.overrides)
 	}
@@ -241,7 +281,7 @@ func (g *Governor) Tick(ctx context.Context) {
 		if ours && c.State == "running" {
 			delete(g.paused, c.ID)
 			g.overrides[c.ID] = true
-			ours = false
+			ours, dirty = false, true
 			g.event("info", c.Name+" was resumed by hand and will be left running until temperatures recover")
 		}
 		switch {
@@ -252,7 +292,7 @@ func (g *Governor) Tick(ctx context.Context) {
 			}
 			c.State = "paused"
 			g.paused[c.ID] = PausedContainer{ID: c.ID, Name: c.Name, Since: g.now(), Reason: reason}
-			ours = true
+			ours, dirty = true, true
 			g.event("warn", fmt.Sprintf("paused %s (%s)", c.Name, reason))
 		case !hot && ours && c.State == "paused":
 			if err := g.engine.Unpause(ctx, c.ID); err != nil {
@@ -261,7 +301,7 @@ func (g *Governor) Tick(ctx context.Context) {
 			}
 			c.State = "running"
 			delete(g.paused, c.ID)
-			ours = false
+			ours, dirty = false, true
 			g.event("info", "resumed "+c.Name)
 		}
 		status.Containers = append(status.Containers, ContainerStatus{
@@ -271,6 +311,9 @@ func (g *Governor) Tick(ctx context.Context) {
 	}
 	status.Paused = g.pausedList()
 	g.publish(status)
+	if dirty {
+		g.save()
+	}
 }
 
 // ResumeAll resumes every container the governor paused and keeps them
@@ -291,6 +334,7 @@ func (g *Governor) ResumeAll(ctx context.Context) error {
 	g.mu.Lock()
 	g.status.Paused = g.pausedList()
 	g.mu.Unlock()
+	g.save()
 	return errors.Join(errs...)
 }
 
@@ -331,7 +375,7 @@ func (g *Governor) usesGPU(ctx context.Context, id string) bool {
 }
 
 // forgetGone drops state for containers that no longer exist.
-func (g *Governor) forgetGone(existing map[string]docker.Container) {
+func (g *Governor) forgetGone(existing map[string]docker.Container) (changed bool) {
 	for id := range g.gpuCache {
 		if _, ok := existing[id]; !ok {
 			delete(g.gpuCache, id)
@@ -341,9 +385,11 @@ func (g *Governor) forgetGone(existing map[string]docker.Container) {
 	for id, p := range g.paused {
 		if _, ok := existing[id]; !ok {
 			delete(g.paused, id)
+			changed = true
 			g.event("info", p.Name+" was removed while paused")
 		}
 	}
+	return changed
 }
 
 func (g *Governor) pausedList() []PausedContainer {
