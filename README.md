@@ -195,9 +195,10 @@ Marketplace requires.
    ```
 
 3. Check the published image: `make validate TAG=0.1.0`.
-4. Submit it to the Marketplace through the form linked from Docker's
-   [publishing guide](https://docs.docker.com/extensions/extensions-sdk/extensions/publish/).
-   After approval it appears under Extensions in every Docker Desktop.
+4. Submit it at <https://www.docker.com/products/extensions/submissions/>.
+   The listing loads the icon and screenshot from this GitHub repository, so
+   the repository must be public by then. After approval the extension
+   appears under Extensions in every Docker Desktop.
 
 Without CI, `docker login` followed by `make push TAG=0.1.0` publishes the
 same multi-platform image.
