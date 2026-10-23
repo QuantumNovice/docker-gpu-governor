@@ -1,0 +1,19 @@
+{
+  "icon": "icon.svg",
+  "vm": {
+    "composefile": "docker-compose.yaml",
+    "exposes": {
+      "socket": "gpu-governor.sock"
+    }
+  },
+  "ui": {
+    "dashboard-tab": {
+      "title": "GPU Governor",
+      "src": "index.html",
+      "root": "ui",
+      "backend": {
+        "socket": "gpu-governor.sock"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# Backend service that Docker Desktop runs in its VM when the extension is
+# installed. The UI talks to it through the unix socket below.
+services:
+  gpu-governor:
+    image: ${DESKTOP_PLUGIN_IMAGE}
+    command: ["serve", "-socket", "/run/guest-services/gpu-governor.sock"]
+    environment:
+      GOVERNOR_IMAGE: ${DESKTOP_PLUGIN_IMAGE}
+    volumes:
+      - /var/run/docker.sock.raw:/var/run/docker.sock
+      - gpu-governor-state:/var/lib/gpu-governor
+
+volumes:
+  gpu-governor-state:
