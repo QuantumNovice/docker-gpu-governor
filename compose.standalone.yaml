@@ -1,0 +1,28 @@
+# Run the governor without Docker Desktop, for example on a Linux server or
+# workstation with the NVIDIA Container Toolkit. CPU temperatures are read
+# from the host's /sys, which Docker Desktop's VM does not expose.
+#
+#   docker compose -f compose.standalone.yaml up -d
+#   curl localhost:9090/status
+services:
+  gpu-governor:
+    image: quantumnovice/gpu-governor:latest
+    container_name: gpu-governor
+    restart: unless-stopped
+    # Long enough to resume every paused container before Docker kills it.
+    stop_grace_period: 30s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gpu-governor-state:/var/lib/gpu-governor
+    ports:
+      - "127.0.0.1:9090:9090"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, utility]
+
+volumes:
+  gpu-governor-state:
