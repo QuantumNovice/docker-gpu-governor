@@ -251,3 +251,45 @@ func TestConfigValidate(t *testing.T) {
 		t.Fatal("zero interval must be rejected")
 	}
 }
+
+func TestManualResumeIsRespectedUntilCool(t *testing.T) {
+	e := newFakeEngine()
+	e.add("train", "running", true, nil)
+	s := &fakeSampler{cpu: 50, gpu: 90}
+	g := newTestGovernor(e, s)
+	ticks(g, 1)
+
+	e.containers["train"].State = "running" // docker unpause from the CLI
+	ticks(g, 3)
+	if e.state("train") != "running" {
+		t.Fatal("governor must not fight a manual resume")
+	}
+
+	s.gpu = 50
+	ticks(g, 2)
+	s.gpu = 90
+	ticks(g, 1)
+	if e.state("train") != "paused" {
+		t.Fatal("the override must expire once temperatures recover")
+	}
+}
+
+func TestResumeAll(t *testing.T) {
+	e := newFakeEngine()
+	e.add("a", "running", true, nil)
+	e.add("b", "running", true, nil)
+	s := &fakeSampler{cpu: 50, gpu: 90}
+	g := newTestGovernor(e, s)
+	ticks(g, 1)
+
+	if err := g.ResumeAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	ticks(g, 2)
+	if e.state("a") != "running" || e.state("b") != "running" {
+		t.Fatal("ResumeAll must resume and keep containers running while hot")
+	}
+	if len(g.Status().Paused) != 0 {
+		t.Fatal("paused list should be empty")
+	}
+}

@@ -136,6 +136,9 @@ type Governor struct {
 	gpuGate  Gate
 	paused   map[string]PausedContainer
 	gpuCache map[string]bool
+	// overrides holds containers the user resumed during the current hot
+	// spell. They are left alone until every sensor recovers.
+	overrides map[string]bool
 
 	// mu guards cfg, status and events, which the API reads.
 	mu     sync.Mutex
@@ -150,13 +153,14 @@ func New(engine Engine, sampler Sampler, cfg Config, log *slog.Logger) *Governor
 		log = slog.Default()
 	}
 	return &Governor{
-		engine:   engine,
-		sampler:  sampler,
-		log:      log,
-		now:      time.Now,
-		cfg:      cfg,
-		paused:   map[string]PausedContainer{},
-		gpuCache: map[string]bool{},
+		engine:    engine,
+		sampler:   sampler,
+		log:       log,
+		now:       time.Now,
+		cfg:       cfg,
+		paused:    map[string]PausedContainer{},
+		gpuCache:  map[string]bool{},
+		overrides: map[string]bool{},
 	}
 }
 
@@ -225,14 +229,23 @@ func (g *Governor) Tick(ctx context.Context) {
 		byID[c.ID] = c
 	}
 	g.forgetGone(byID)
+	if !hot {
+		clear(g.overrides)
+	}
 
 	reason := hotReason(cpu, gpu)
 	for _, c := range containers {
 		usesGPU := g.usesGPU(ctx, c.ID)
 		target := IsTarget(cfg.Mode, c, usesGPU)
 		_, ours := g.paused[c.ID]
+		if ours && c.State == "running" {
+			delete(g.paused, c.ID)
+			g.overrides[c.ID] = true
+			ours = false
+			g.event("info", c.Name+" was resumed by hand and will be left running until temperatures recover")
+		}
 		switch {
-		case hot && target && c.State == "running":
+		case hot && target && c.State == "running" && !g.overrides[c.ID]:
 			if err := g.engine.Pause(ctx, c.ID); err != nil {
 				g.event("error", fmt.Sprintf("could not pause %s: %v", c.Name, err))
 				break
@@ -258,6 +271,27 @@ func (g *Governor) Tick(ctx context.Context) {
 	}
 	status.Paused = g.pausedList()
 	g.publish(status)
+}
+
+// ResumeAll resumes every container the governor paused and keeps them
+// running until temperatures recover.
+func (g *Governor) ResumeAll(ctx context.Context) error {
+	g.tickMu.Lock()
+	defer g.tickMu.Unlock()
+	var errs []error
+	for id, p := range g.paused {
+		if err := g.engine.Unpause(ctx, id); err != nil && !errors.Is(err, docker.ErrNotFound) {
+			errs = append(errs, fmt.Errorf("%s: %w", p.Name, err))
+			continue
+		}
+		delete(g.paused, id)
+		g.overrides[id] = true
+		g.event("info", "resumed "+p.Name+" by request")
+	}
+	g.mu.Lock()
+	g.status.Paused = g.pausedList()
+	g.mu.Unlock()
+	return errors.Join(errs...)
 }
 
 func (g *Governor) observe(ctx context.Context, kind string, read func(context.Context) ([]sensor.Reading, error), l Limits, gate *Gate) SensorStatus {
@@ -301,6 +335,7 @@ func (g *Governor) forgetGone(existing map[string]docker.Container) {
 	for id := range g.gpuCache {
 		if _, ok := existing[id]; !ok {
 			delete(g.gpuCache, id)
+			delete(g.overrides, id)
 		}
 	}
 	for id, p := range g.paused {
