@@ -11,6 +11,7 @@ import { errorMessage, getStatus, resumeAll, toast, type Status } from "./api";
 import { ActivityLog } from "./components/ActivityLog";
 import { ContainersTable } from "./components/ContainersTable";
 import { SensorCard } from "./components/SensorCard";
+import { Settings } from "./components/Settings";
 
 const POLL_MS = 2000;
 
@@ -115,6 +116,13 @@ export function App() {
           Containers
         </Typography>
         <ContainersTable containers={status.containers ?? []} />
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h3" gutterBottom>
+          Settings
+        </Typography>
+        <Settings config={cfg} onSaved={(config) => setStatus({ ...status, config })} />
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
