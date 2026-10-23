@@ -363,7 +363,9 @@ func (g *Governor) observe(ctx context.Context, kind string, read func(context.C
 	hottest, ok := sensor.Max(readings)
 	ok = ok && err == nil
 	s := SensorStatus{Available: ok, Readings: readings, MaxC: hottest.TempC}
-	if err != nil && !errors.Is(err, sensor.ErrUnavailable) {
+	// A bare ErrUnavailable just means the machine has no such sensor.
+	// Anything wrapped around it explains why and is worth showing.
+	if err != nil && err != sensor.ErrUnavailable {
 		s.Error = err.Error()
 	}
 	if gate.Observe(l, hottest.TempC, ok) {

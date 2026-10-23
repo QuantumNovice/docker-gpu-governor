@@ -3,6 +3,7 @@ package governor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -308,5 +309,19 @@ func TestShutdownResumesPausedContainers(t *testing.T) {
 	}
 	if e.state("mine") != "paused" {
 		t.Fatal("shutdown must not touch containers paused by the user")
+	}
+}
+
+func TestSensorErrorIsReported(t *testing.T) {
+	e := newFakeEngine()
+	s := &fakeSampler{cpuErr: sensor.ErrUnavailable, gpuErr: fmt.Errorf("%w: no gpu runtime", sensor.ErrUnavailable)}
+	g := newTestGovernor(e, s)
+	ticks(g, 1)
+	st := g.Status()
+	if st.CPU.Error != "" {
+		t.Fatalf("plain ErrUnavailable should not be shown, got %q", st.CPU.Error)
+	}
+	if st.GPU.Error == "" {
+		t.Fatal("a wrapped error should be shown")
 	}
 }
