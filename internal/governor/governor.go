@@ -338,6 +338,26 @@ func (g *Governor) ResumeAll(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// Shutdown resumes every container the governor paused. It runs when the
+// governor stops so that removing or disabling it never leaves workloads
+// frozen with nothing left to thaw them. Containers it fails to resume stay
+// in the saved state and are handled by the next run.
+func (g *Governor) Shutdown(ctx context.Context) error {
+	g.tickMu.Lock()
+	defer g.tickMu.Unlock()
+	var errs []error
+	for id, p := range g.paused {
+		if err := g.engine.Unpause(ctx, id); err != nil && !errors.Is(err, docker.ErrNotFound) {
+			errs = append(errs, fmt.Errorf("%s: %w", p.Name, err))
+			continue
+		}
+		delete(g.paused, id)
+		g.event("info", "resumed "+p.Name+" on shutdown")
+	}
+	g.save()
+	return errors.Join(errs...)
+}
+
 func (g *Governor) observe(ctx context.Context, kind string, read func(context.Context) ([]sensor.Reading, error), l Limits, gate *Gate) SensorStatus {
 	readings, err := read(ctx)
 	hottest, ok := sensor.Max(readings)

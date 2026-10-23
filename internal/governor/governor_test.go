@@ -293,3 +293,20 @@ func TestResumeAll(t *testing.T) {
 		t.Fatal("paused list should be empty")
 	}
 }
+
+func TestShutdownResumesPausedContainers(t *testing.T) {
+	e := newFakeEngine()
+	e.add("train", "running", true, nil)
+	e.add("mine", "paused", true, nil)
+	g := newTestGovernor(e, &fakeSampler{cpu: 50, gpu: 90})
+	ticks(g, 1)
+	if err := g.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if e.state("train") != "running" {
+		t.Fatal("shutdown must resume containers the governor paused")
+	}
+	if e.state("mine") != "paused" {
+		t.Fatal("shutdown must not touch containers paused by the user")
+	}
+}
