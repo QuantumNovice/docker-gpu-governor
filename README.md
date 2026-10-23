@@ -1,11 +1,23 @@
-# GPU Governor
+# GPU Governor: overheating protection for Docker containers
 
-A Docker Desktop extension that watches GPU and CPU temperatures and pauses
-containers when the hardware gets too hot. Once the temperature drops back
-into a safe range, it resumes them. The containers are frozen, not stopped,
-so a training run, render or batch job continues from exactly where it was.
+[![Docker Hub](https://img.shields.io/docker/v/hasisyed/gpu-governor?sort=semver&label=docker%20hub)](https://hub.docker.com/r/hasisyed/gpu-governor)
+[![Image size](https://img.shields.io/docker/image-size/hasisyed/gpu-governor?sort=semver)](https://hub.docker.com/r/hasisyed/gpu-governor)
+[![Docker pulls](https://img.shields.io/docker/pulls/hasisyed/gpu-governor)](https://hub.docker.com/r/hasisyed/gpu-governor)
+[![CI](https://github.com/QuantumNovice/docker-gpu-governor/actions/workflows/ci.yml/badge.svg)](https://github.com/QuantumNovice/docker-gpu-governor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![Dashboard](docs/screenshot.png)
+A Docker Desktop extension that monitors **NVIDIA GPU temperature** and
+**CPU temperature** and pauses containers when the hardware gets too hot.
+Once the temperature drops back into a safe range, it resumes them. The
+containers are frozen, not stopped, so a PyTorch training run, Stable
+Diffusion render, Ollama model or batch job continues from exactly where it
+was. Useful on gaming laptops, compact PCs and home labs where long GPU
+workloads cause thermal throttling.
+
+**[Open in Docker Desktop](https://open.docker.com/extensions/marketplace?extensionId=hasisyed/gpu-governor&tag=latest)**
+or run `docker extension install hasisyed/gpu-governor:latest`.
+
+![GPU Governor dashboard with the GPU over its limit and two containers paused](docs/screenshot.png)
 
 ## How it works
 
@@ -83,20 +95,25 @@ extensions.
 
 ## Install
 
-### From the Extensions Marketplace
+### One-click link
 
-Open Docker Desktop, go to **Extensions**, search for **GPU Governor** and
-click **Install**.
+[Open GPU Governor in Docker Desktop](https://open.docker.com/extensions/marketplace?extensionId=hasisyed/gpu-governor&tag=latest).
+Docker Desktop opens the extension's page with an **Install** button.
 
-### From Docker Hub
+### Command line
 
 ```sh
-docker extension install hasisyed/gpu-governor:0.1.0
+docker extension install hasisyed/gpu-governor:latest
 ```
 
-Docker Desktop only accepts extensions that are not yet in the Marketplace if
-**Settings > Extensions > Allow only extensions distributed through the
+Until the extension is listed in the Marketplace, Docker Desktop only installs
+it if **Settings > Extensions > Allow only extensions distributed through the
 Docker Marketplace** is turned off.
+
+### From the Extensions Marketplace
+
+Once approved: open Docker Desktop, go to **Extensions > Browse**, search for
+**GPU Governor** and click **Install**.
 
 ### Requirements
 
