@@ -1,0 +1,35 @@
+name: docker hub description
+
+# Keeps the Docker Hub overview in sync with docs/dockerhub.md. Needs the
+# same DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets as the release workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/dockerhub.md
+      - .github/workflows/dockerhub-description.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CAN_PUSH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: peter-evans/dockerhub-description@v4
+        if: env.CAN_PUSH == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_IMAGE || 'hasisyed/gpu-governor' }}
+          short-description: "Pause Docker containers when your NVIDIA GPU or CPU overheats; auto-resume when cool, no work lost."
+          readme-filepath: docs/dockerhub.md
+      - name: Note missing Docker Hub credentials
+        if: env.CAN_PUSH != 'true'
+        run: echo "::warning::DOCKERHUB_USERNAME or DOCKERHUB_TOKEN is not set, so the Docker Hub overview was not updated."
