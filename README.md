@@ -91,7 +91,7 @@ click **Install**.
 ### From Docker Hub
 
 ```sh
-docker extension install quantumnovice/gpu-governor:0.1.0
+docker extension install hasisyed/gpu-governor:0.1.0
 ```
 
 Docker Desktop only accepts extensions that are not yet in the Marketplace if
@@ -184,7 +184,7 @@ Marketplace requires.
 
 1. In the GitHub repository settings, add the secrets `DOCKERHUB_USERNAME` and
    `DOCKERHUB_TOKEN` (a Docker Hub access token with read and write scope).
-   If the Docker Hub repository is not `quantumnovice/gpu-governor`, set the
+   If the Docker Hub repository is not `hasisyed/gpu-governor`, set the
    variable `DOCKERHUB_IMAGE` and update `IMAGE` in the `Makefile`.
 2. Update `com.docker.extension.changelog` in the `Dockerfile`, then tag and
    push:

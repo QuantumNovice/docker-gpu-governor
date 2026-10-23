@@ -6,7 +6,7 @@
 #   curl localhost:9090/status
 services:
   gpu-governor:
-    image: quantumnovice/gpu-governor:latest
+    image: hasisyed/gpu-governor:latest
     container_name: gpu-governor
     restart: unless-stopped
     # Long enough to resume every paused container before Docker kills it.

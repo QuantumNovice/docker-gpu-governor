@@ -1,4 +1,4 @@
-IMAGE ?= quantumnovice/gpu-governor
+IMAGE ?= hasisyed/gpu-governor
 TAG ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 0.0.0)
 PLATFORMS ?= linux/amd64,linux/arm64
 BUILDER ?= gpu-governor-builder
