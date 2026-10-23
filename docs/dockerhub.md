@@ -14,7 +14,8 @@ where long AI or GPU workloads push the hardware into thermal throttling.
 
 ## Install
 
-**Docker Desktop extension**
+**[Open in Docker Desktop](https://open.docker.com/extensions/marketplace?extensionId=hasisyed/gpu-governor&tag=latest)**
+(one click, shows an Install button), or from a terminal:
 
 ```sh
 docker extension install hasisyed/gpu-governor:latest
